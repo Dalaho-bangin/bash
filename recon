@@ -1,0 +1,309 @@
+#!/bin/bash
+
+if [[ $# -eq 0 ]];
+then
+    echo "Enter domain target "
+    exit 1
+fi
+source ~/.bashrc
+source ~/.bash_profile
+
+url=$1
+
+if [ ! -d "~/recon/$url" ];then
+        mkdir ~/recon/$url
+fi
+if [ ! -d "~/recon/$url/subdomains" ];then
+        mkdir ~/recon/$url/subdomains
+fi
+if [ ! -d "~/recon/$url/PortScan" ];then
+        mkdir ~/recon/$url/PortScan
+fi
+if [ ! -d "~/recon/$url/Vulnerability" ];then
+        mkdir ~/recon/$url/Vulnerability
+fi
+if [ ! -d "~/recon/$url/Vulnerability/nuclei" ];then
+        mkdir ~/recon/$url/Vulnerability/nuclei
+fi
+if [ ! -d "~/recon/$url/Vulnerability/Jses" ];then
+        mkdir ~/recon/$url/Vulnerability/Jses
+fi
+
+if [ ! -f "~/recon/$url/subdomains/custom" ];then
+        touch ~/recon/$url/subdomains/custom
+fi
+if [ ! -f "~/recon/$url/subdomains/virustotalSubdomain" ];then
+        touch ~/recon/$url/subdomains/virustotalSubdomain
+fi
+
+if [ ! -f "~/recon/$url/subdomains/subfinder" ];then
+        touch ~/recon/$url/subdomains/subfinder
+fi
+
+if [ ! -f "~/recon/$url/subdomains/assetfinder" ];then
+        touch ~/recon/$url/subdomains/assetfinder
+fi
+if [ ! -f "~/recon/$url/subdomains/gau" ];then
+        touch ~/recon/$url/subdomains/gau
+fi
+if [ ! -f "~/recon/$url/subdomains/githubSearch" ];then
+        touch ~/recon/$url/subdomains/githubSearch
+fi
+if [ ! -f "~/recon/$url/subdomains/ctl" ];then
+        touch ~/recon/$url/subdomains/ctl
+fi
+if [ ! -f "~/recon/$url/subdomains/abuseipdb" ];then
+        touch ~/recon/$url/subdomains/abuseipdb
+fi
+
+if [ ! -f "~/recon/$url/subdomains/amass" ];then
+        touch ~/recon/$url/subdomains/amass
+fi
+if [ ! -f "~/recon/$url/ips" ];then
+        touch ~/recon/$url/ips
+fi
+if [ ! -f "~/recon/$url/subdomains/gospider" ];then
+        touch ~/recon/$url/subdomains/gospider
+fi
+if [ ! -f "~/recon/$url/subdomains/shuffleDNS" ];then
+        touch ~/recon/$url/subdomains/shuffleDNS
+fi
+if [ ! -f "~/recon/$url/subdomains/shuffledns_custom" ];then
+        touch ~/recon/$url/subdomains/shuffledns_custom
+fi
+if [ ! -f "~/recon/$url/subdomains/consolidated" ];then
+        touch ~/recon/$url/subdomains/consolidated
+fi
+if [ ! -f "~/recon/$url/subdomains/dnsgen" ];then
+        touch ~/recon/$url/subdomains/dnsgen
+fi
+
+if [ ! -f "~/recon/$url/subdomains/httprobe" ];then
+        touch ~/recon/$url/subdomains/httprobe
+fi
+
+if [ ! -f "~/recon/$url/subdomains/httprobeAdded" ];then
+        touch ~/recon/$url/subdomains/httprobeAdded
+fi
+
+if [ ! -f "~/recon/$url/subdomains/httprobeRemoved" ];then
+        touch ~/recon/$url/subdomains/httprobeRemoved
+fi
+
+if [ ! -f "~/recon/$url/subdomains/gau" ];then
+        touch ~/recon/$url/subdomains/gau
+fi
+if [ ! -f "~/recon/$url/subdomains/findomain" ];then
+        touch ~/recon/$url/subdomains/findomain
+fi
+if [ ! -f "~/recon/$url/subdomains/cero" ];then
+        touch ~/recon/$url/subdomains/cero
+fi
+
+echo -e "\e[1;31m [+] Launching custome script for find Subdomains \e[0m"
+curl -s "https://rapiddns.io/subdomain/$url?full=1#result" | grep "<td><a" | cut -d '"' -f 2  | cut -d '/' -f3 | sed 's/#results//g' |sed 's/#result//g' | grep $url|sed 's/\?t=cname//g'|sed 's/\.$//g'| anew /tmp/custom
+curl -s "https://riddler.io/search/exportcsv?q=pld:$url" | grep -Po "(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | anew /tmp/custom
+cat /tmp/custom | anew ~/recon/$url/subdomains/custom
+rm -rf  /tmp/custom 
+echo ""
+
+echo -e "\e[1;31m [+] Launching Virustotal Subdomain Scrape to check for subdomains \e[0m"
+python3 ~/Tools/virustotal-subdomain-scraper/vt-subdomains.py  $url | anew /tmp/virustotalSubdomain
+cat /tmp/virustotalSubdomain | anew ~/recon/$url/subdomains/virustotalSubdomain
+rm -rf /tmp/virustotalSubdomain
+echo ""
+
+echo -e "\e[1;31m [+] Launching subfinder  to check for subdomains \e[0m"
+subfinder -d $url -o /tmp/subfinder
+cat /tmp/subfinder | anew ~/recon/$url/subdomains/subfinder
+rm -rf /tmp/subfinder
+echo ""
+
+echo -e "\e[1;31m [+] Launching subfinder recursive  to check for subdomains \e[0m"
+subfinder -d $url  -recursive -o /tmp/subfinder
+cat /tmp/subfinder | anew ~/recon/$url/subdomains/subfinder
+rm -rf /tmp/subfinder
+echo ""
+
+echo -e "\e[1;31m [+] Launching assetfinder  to check for subdomains \e[0m"
+assetfinder --subs-only $url > /tmp/assetfinder
+cat /tmp/assetfinder | anew ~/recon/$url/subdomains/assetfinder
+rm -rf /tmp/assetfinder
+echo ""
+
+echo -e "\e[1;31m [+] Launching gau  to check for subdomains \e[0m"
+gau --subs $url | cut -d / -f3 | sort -u  > /tmp/gau
+cat /tmp/gau | anew  ~/recon/$url/subdomains/gau
+rm -rf /tmp/gau
+echo ""
+
+echo -e "\e[1;31m [+] Launching  github-subdomain  to check for subdomains \e[0m"
+source ~/.bashrc
+github-subdomains -d $url -k .
+cat $url.txt | anew ~/recon/$url/subdomains/githubSearch
+rm -rf $url.txt
+echo ""
+
+echo -e "\e[1;31m [+] Launching crt.sh to check for subdomains \e[0m"
+curl -s https://crt.sh/\?q=$url\&output\=json| jq -r '.[].common_name' |sed 's/\*.//g' | sort -u > /tmp/ctl
+sort -u /tmp/ctl | anew ~/recon/$url/subdomains/ctl
+rm -rf /tmp/ctl
+echo ""
+
+echo -e "\e[1;31m [+] Launching findomain  to check for subdomains \e[0m"
+findomain --quiet --target $url 1> /tmp/findomain 2>/dev/null
+sort -u /tmp/findomain | anew ~/recon/$url/subdomains/findomain
+rm -rf /tmp/findomain
+echo ""
+
+echo -e "\e[1;31m [+] Launching abuseipdb to check for subdomains \e[0m"
+curl -s "https://www.abuseipdb.com/whois/$1" -H "user-agent: Chrome" | grep -E '<li>\w.*</li>'| grep -o '<li>.*</li>' | sed -e 's/<[^>]*>//g'| sed "s/$/.$1/g" > /tmp/abuseipdb
+sort -u /tmp/abuseipdb | anew ~/recon/$url/subdomains/abuseipdb
+rm -rf /tmp/abuseipdb
+echo ""
+
+ echo -e "\e[1;31m [+] Launching amass  to Discover targets for enumerations \e[0m"
+ amass enum -src -ip -brute -ipv4 -min-for-recursive 2 -timeout 60 -d $url > /tmp/amass
+#cp /tmp/amass.tmp /tmp/amass.full
+sed -i -E 's/\[(.*?)\] +//g' /tmp/amass
+cat /tmp/amass | awk '{print $2}' | sed 's/,/\n/g' | sort -u | anew ~/recon/$url/ips
+sed -i -E 's/ ([0-9]{1,3}\.)[0-9].*//g' /tmp/amass
+cat /tmp/amass | anew ~/recon/$url/subdomains/amass
+rm -rf /tmp/amass
+echo ""
+
+echo -e "\e[1;31m [+] Launching gospider  to check for subdomains \e[0m"
+gospider -s "https://$url" -o /tmp/gospider -c 10 -d 1 --other-source --subs --include-subs
+outputFile=`echo $url | sed 's/\./_/g'`
+cat /tmp/gospider/$outputFile | cut -d " " -f 3 | cut -d "/" -f 3 | grep $url | sort -u | anew  ~/recon/$url/subdomains/gospider
+rm -rf /tmp/gospider
+echo ""
+
+echo -e "\e[1;31m [+]  shuffleDNS  to enumerate valid subdomains \e[0m"
+shuffledns -d $url -w ~/wordlist/10m-sub-voorivex.txt -r ~/wordlist/resolvers.txt -m ~/tools/massdns/bin/massdns -o /tmp/shuffleDNS
+cat /tmp/shuffleDNS | anew ~/recon/$url/subdomains/shuffleDNS
+rm -rf /tmp/shuffleDNS
+echo ""
+
+echo -e "\e[1;31m [+] Build cewl WordList \e[0m"
+cewler --output ~/wordlist/cewl_$url.txt https://$url
+echo ""
+
+echo -e "\e[1;31m [+]  shuffleDNS custom  to enumerate valid subdomains \e[0m"
+shuffledns -d $url -w ~/wordlist/cewl_$url.txt -r ~/wordlist/resolvers.txt -m ~/tools/massdns/bin/massdns -o /tmp/shuffledns_custom
+cat /tmp/shuffledns_custom | anew ~/recon/$url/subdomains/shuffledns_custom
+rm -rf /tmp/shuffledns_custom
+rm -rf ~/wordlist/cewl_$url.txt
+echo ""
+
+echo -e "\e[1;31m [+] Launching cero  to check for subdomains \e[0m"
+rm -rf  /tmp/allsubs
+cd ~/recon/$url/subdomains
+ls | while read subs;do cat $subs > /tmp/allsubs;done
+cat  /tmp/allsubs | cero  | sed 's/*\.//g' | grep -F ".$url" > /tmp/cero
+sort -u /tmp/cero | anew ~/recon/$url/subdomains/cero
+rm -rf /tmp/cero
+rm -rf /tmp/allsubs
+cd -
+echo ""
+
+echo -e "\e[1;31m [+] Launching OneForAll  to find subdomains \e[0m"
+python3 ~/tools/OneForAll/oneforall.py --target $url run 
+cat  ~/tools/OneForAll/results/$url.csv | cut -d "," -f 6 | anew ~/recon/$url/subdomains/OneForAll
+echo ""
+
+echo -e "\e[1;31m [+] Launching OneForAll  to find subdomains \e[0m"
+python3 ~/tools/AORT/AORT.py -d $url --quiet --output /tmp/$url-AORT.txt       
+cat  /tmp/$url-AORT.txt | sed 's/*\.//g' | anew ~/recon/$url/subdomains/AORT.txt
+rm -rf /tmp/$url-AORT.txt
+echo ""
+
+
+echo -e "\e[1;31m [+] consolidate  \e[0m"
+rm -rf /tmp/previous_consolidated
+rm -rf /tmp/consolidat
+cat ~/recon/$url/subdomains/consolidat > /tmp/previous_consolidated
+cd ~/recon/$url/subdomains
+ls | while read subs;do cat $subs > /tmp/consolidat;done
+
+if [ -s  /tmp/previous_consolidated ]; then
+    rm -rf /tmp/new_consolidat
+    comm -3 /tmp/previous_consolidated /tmp/consolidat | sort -u | grep $url > /tmp/new_consolidat
+
+#     echo -e "\e[1;31m [+]  shuffleDNS  to enumerate valid subdomain \e[0m"
+#     shuffledns -l /tmp/new_consolidat -r ~/wordlist/resolvers.txt -m ~/tools/massdns/bin/massdns -o /tmp/r-new_consolidat
+#     echo ""
+
+    echo -e "\e[1;31m [+]  Launching DNSGen  to generate lists of domain names . \e[0m"
+    dnsgen /tmp/new_consolidat | shuffledns -d $url -r ~/wordlist/resolvers.txt -m ~/tools/massdns/bin/massdns -o /tmp/permute1_tmp.txt &>/dev/null
+    cat /tmp/permute1_tmp.txt | grep -F ".$url" > /tmp/permute1.txt 
+    dnsgen /tmp/permute1.txt  | shuffledns -d $url -r ~/wordlist/resolvers.txt -m ~/tools/massdns/bin/massdns -o /tmp/permute2_tmp.txt &>/dev/null
+    cat /tmp/permute2_tmp.txt | grep -F ".$url" > /tmp/permute2.txt
+    cat /tmp/permute1.txt /tmp/permute2.txt | grep -F ".$domain" | sort -u > /tmp/sort-dnsgen-new_consolidat
+    echo ""
+
+
+    cat /tmp/sort-dnsgen-new_consolidat > ~/recon/$url/subdomains/dnsgen
+    cat /tmp/sort-dnsgen-new_consolidat | anew ~/recon/$url/subdomains/consolidat
+
+    rm -rf /tmp/sort-dnsgen-new_consolidat
+
+    rm -rf /tmp/new_consolidat
+    rm -rf /tmp/previous_consolidated
+    rm -rf /tmp/permute1_tmp.txt
+    rm -rf /tmp/permute2_tmp.txt
+    rm -rf /tmp/permute1.txt 
+    rm -rf /tmp/permute2.txt
+    rm -rf /tmp/permute.txt
+else
+
+#     echo -e "\e[1;31m [+]  shuffleDNS  to enumerate valid subdomain \e[0m"
+#     shuffledns -l /tmp/consolidat -r ~/wordlist/resolvers.txt -m ~/tools/massdns/bin/massdns -o /tmp/r-consolidat
+#     echo ""
+
+    echo -e "\e[1;31m [+]  Launching DNSGen  to generate lists of domain names . \e[0m"
+    dnsgen /tmp/consolidat | shuffledns -d $url -r ~/wordlist/resolvers.txt -m ~/tools/massdns/bin/massdns -o /tmp/permute1_tmp.txt &>/dev/null
+    cat /tmp/permute1_tmp.txt | grep -F ".$url" > /tmp/permute1.txt 
+    dnsgen /tmp/permute1.txt  | shuffledns -d $url -r ~/wordlist/resolvers.txt -m ~/tools/massdns/bin/massdns -o /tmp/permute2_tmp.txt &>/dev/null
+    cat /tmp/permute2_tmp.txt | grep -F ".$url" > /tmp/permute2.txt
+    cat /tmp/permute1.txt /tmp/permute2.txt | grep -F ".$url" | sort -u > /tmp/sort-dnsgen-new_consolidat
+    echo ""
+
+#     echo -e "\e[1;31m [+] httprobe is a fast and multi-purpose HTTP toolkit that allows running multiple probes using the retryablehttp library. \e[0m"
+#     cat /tmp/s-dnsgen-consolidat | httpx -  | anew /tmp/h-dnsgen-consolidat
+#     echo ""
+
+    cat /tmp/sort-dnsgen-new_consolidat > ~/recon/$url/subdomains/dnsgen
+    cat /tmp/sort-dnsgen-new_consolidat | anew /tmp/consolidat
+    cat /tmp/consolidat | anew ~/recon/$url/subdomains/consolidat
+
+    rm -rf /tmp/sort-dnsgen-new_consolidat
+    rm -rf /tmp/consolidated
+    rm -rf /tmp/consolidat
+fi
+cd -
+echo ""
+
+echo -e "\e[1;31m [+] httprobe is a fast and multi-purpose HTTP toolkit that allows running multiple probes using the retryablehttp library. \e[0m"
+cat ~/recon/$url/subdomains/consolidat > /tmp/consolidat
+cat ~/recon/$url/subdomains/httprobe | anew /tmp/previous_httprobe
+httpx -l /tmp/consolidat -silent -timeout 20 -o /tmp/sub.httpx &>/dev/null
+httpx -l /tmp/consolidat -csp-probe -silent -timeout 20 | grep -F ".$url" | anew /tmp/sub.httpx &>/dev/null
+httpx -l /tmp/consolidat -tls-probe -silent -timeout 20 | grep -F ".$url" | anew /tmp/sub.httpx &>/dev/null
+cat /tmp/sub.httpx > /tmp/httprobe_results
+grep -vFf /tmp/previous_httprobe  /tmp/httprobe_results | anew /tmp/httprobeAdded
+grep -vFf /tmp/httprobe_results /tmp/previous_httprobe  | anew /tmp/httprobeRemoved
+cat /tmp/httprobe_results > ~/recon/$url/subdomains/httprobe
+cat /tmp/httprobeAdded > ~/recon/$url/subdomains/httprobeAdded
+cat /tmp/httprobeRemoved > ~/recon/$url/subdomains/httprobeRemoved
+
+rm -rf /tmp/httprobe_results
+rm -rf /tmp/consolidat
+rm -rf /tmp/httprobeAdded
+rm -rf /tmp/sub.httpx
+rm -rf /tmp/httprobeRemoved
+rm -rf /tmp/previous_httprobe
+echo ""
+
+echo -e "\e[1;32m[+] Recon Stage Completed :) \e[0m"
+python3 ~/tools/telify/telify.py -m "Recon Stage Completed"

